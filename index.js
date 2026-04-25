@@ -7,7 +7,6 @@ const {
 const pino = require('pino');
 
 async function startBot() {
-    // Railway dia mitahiry ny dossier 'session_wa' raha voa-configure tsara
     const { state, saveCreds } = await useMultiFileAuthState('session_wa');
     const { version } = await fetchLatestBaileysVersion();
     
@@ -20,25 +19,21 @@ async function startBot() {
     });
 
     if (!sock.authState.creds.registered) {
-        const phoneNumber = process.env.PHONE; // Ho fenoina ao amin'ny Railway
-        if (!phoneNumber) {
-            console.error("TSY MISY PHONE NUMBER! Ampidiro ao amin'ny Railway Variables.");
-            return;
-        }
+        // AMPIDIRINA MIVANTANA ETO NY NOMERAO
+        const phoneNumber = "261382266876"; 
 
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
                 console.log(`\n\x1b[1;32m==============================\n=> PAIRING CODE-NAO: ${code}\n==============================\x1b[0m\n`);
             } catch (err) {
-                console.error("Tsy nahazo pairing code. Jereo ny version na ny IP.");
+                console.error("Tsy nahazo pairing code.");
             }
-        }, 10000); // 10 segondra mba ho azo antoka ny fifandraisana
+        }, 10000);
     }
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- MIARAHABA MEMBRE VAOVAO ---
     sock.ev.on('group-participants.update', async (update) => {
         if (update.action === 'add') {
             for (let num of update.participants) {
@@ -48,18 +43,14 @@ async function startBot() {
         }
     });
 
-    // --- MODERATION SY FAMALIANA ---
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe || !msg.key.remoteJid.endsWith('@g.us')) return;
-
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").toLowerCase();
         const sender = msg.key.participant;
         const groupId = msg.key.remoteJid;
-
         const hasLink = text.includes("http://") || text.includes("https://") || text.includes("www.");
         const isAllowedDomain = text.includes("milavolamada.lovable.app");
-
         if (hasLink && !isAllowedDomain) {
             try {
                 await sock.sendMessage(groupId, { delete: msg.key });
