@@ -18,71 +18,73 @@ async function startBot() {
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
-    // Ny nomeraonao mivantana
-    const phoneNumber = "261382266876"; 
+    const myNumber = "261382266876"; 
 
+    // Pairing code raha mbola tsy registered
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n\x1b[1;32m==============================\n=> PAIRING CODE-NAO: ${code}\n==============================\x1b[0m\n`);
+                const code = await sock.requestPairingCode(myNumber);
+                console.log(`\n=> PAIRING CODE: ${code}\n`);
             } catch (err) {
-                console.error("Tsy nahazo pairing code.");
+                console.error("Error request pairing code");
             }
         }, 10000);
     }
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- 1. FIARAHABANA SY TOROLALANA NEXUS ---
+    // --- 1. FIARAHABANA ---
     sock.ev.on('group-participants.update', async (update) => {
         if (update.action === 'add') {
             for (let num of update.participants) {
-                const welcomeMsg = `Salama 👋 Tongasoa ato amin'ny vondrona!
+                const welcomeMsg = `Salama 👋 Tongasoa!
                 
 📢 *FILAZANA OFISIALY – NEXUS*
 
-📥 *1. LIEN FAKANA APPLICATION NEXUS*
-👉 https://drive.google.com/file/d/1BKlyhVPtcGbiZsTaIEIfkiJDmJPApVvX/view?usp=drivesdk
-
-🚀 *2. LIEN FANAOVANA BOOST*
-👉 https://drive.google.com/file/d/1s4OFJEcYgfvLk4THBqLdQQpzT637EF6P/view?usp=drivesdk
-
-💼 *3. FANAOVANA TÂCHE (TOROLÀLANA)*
-👉 https://drive.google.com/file/d/17L0dbEYMf4LNKopjdGqKjVcVAe8EG1wb/view?usp=drivesdk
-
-✨ Araho tsara ireo torolàlana rehetra ao amin’ireo lien ireo. 
-💙 *NEXUS dia eto hanampy anao hahomby!*`;
+📥 *1. LIEN APPLICATION:* https://drive.google.com/file/d/1BKlyhVPtcGbiZsTaIEIfkiJDmJPApVvX/view?usp=drivesdk
+🚀 *2. LIEN BOOST:* https://drive.google.com/file/d/1s4OFJEcYgfvLk4THBqLdQQpzT637EF6P/view?usp=drivesdk
+💼 *3. TOROLÀLANA TÂCHE:* https://drive.google.com/file/d/17L0dbEYMf4LNKopjdGqKjVcVAe8EG1wb/view?usp=drivesdk`;
 
                 await sock.sendMessage(update.id, { text: welcomeMsg });
             }
         }
     });
 
-    // --- 2. MODERATION MAHERY VAIKA (Anti-Link) ---
+    // --- 2. MODERATION ANTI-LINK ---
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe || !msg.key.remoteJid.endsWith('@g.us')) return;
 
-        const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").toLowerCase();
-        const sender = msg.key.participant || msg.key.remoteJid;
+        const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.groupInviteMessage?.caption || "").toLowerCase();
         const groupId = msg.key.remoteJid;
+        
+        // Fantarina ny mpandefa (Sender)
+        const sender = msg.key.participant || msg.key.remoteJid;
+        const senderNumber = sender.split('@')[0];
 
-        // Fepetra: raha misy rohy nefa TSY misy an'ireo rohy NEXUS ireo
-        const hasLink = text.includes("http://") || text.includes("https://") || text.includes("www.");
-        const isNexusLink = text.includes("drive.google.com") || text.includes("milavolamada.lovable.app");
+        // Jereo raha misy rohy
+        const hasLink = /(https?:\/\/[^\s]+|www\.[^\s]+)/g.test(text);
+        
+        // Ireo rohy mahazo alalana (Nexus sy Drive)
+        const isAllowed = text.includes("drive.google.com") || text.includes("milavolamada.lovable.app");
 
-        if (hasLink && !isNexusLink) {
+        // RAHA MISY ROHY NEFA TSY AVY AMINAO SY TSY ROHY NEXUS
+        if (hasLink && !isAllowed && senderNumber !== myNumber) {
+            console.log(`Rohy voatsikaritra avy amin'i: ${senderNumber}`);
+            
             try {
-                // 1. Fafana ilay hafatra
+                // Fafana aloha ilay message
                 await sock.sendMessage(groupId, { delete: msg.key });
-                
-                // 2. Esosina miala ilay olona
+
+                // Esosina ilay olona
                 await sock.groupParticipantsUpdate(groupId, [sender], "remove");
                 
-                console.log(`Olona 1 nesorina tao amin'ny ${groupId} satria nandefa rohy.`);
-            } catch (e) { 
-                console.log("Admin error: Mety tsy Admin ny Bot na nisy olana."); 
+                // Hafatra fampitandremana (Optionnel)
+                await sock.sendMessage(groupId, { text: `⚠️ Nesorina i @${senderNumber} satria nandefa rohy tsy mahazo alalana.`, mentions: [sender] });
+
+            } catch (e) {
+                console.log("Tsy afaka mamafa olona: Hamarino raha ADMIN ny BOT.");
             }
         }
     });
@@ -93,10 +95,9 @@ async function startBot() {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
         } else if (connection === 'open') {
-            console.log('BOT NEXUS EFA VELONA!');
+            console.log('BOT NEXUS MANDREHA...');
         }
     });
 }
 
 startBot();
-
