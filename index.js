@@ -18,9 +18,9 @@ async function startBot() {
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
+    // NOMERAONAO MANOKANA (Ilay Bot)
     const myNumber = "261382266876"; 
 
-    // Pairing code raha mbola tsy registered
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
@@ -34,7 +34,7 @@ async function startBot() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- 1. FIARAHABANA ---
+    // --- 1. BIENVENUE & NEXUS INFO ---
     sock.ev.on('group-participants.update', async (update) => {
         if (update.action === 'add') {
             for (let num of update.participants) {
@@ -44,14 +44,16 @@ async function startBot() {
 
 📥 *1. LIEN APPLICATION:* https://drive.google.com/file/d/1BKlyhVPtcGbiZsTaIEIfkiJDmJPApVvX/view?usp=drivesdk
 🚀 *2. LIEN BOOST:* https://drive.google.com/file/d/1s4OFJEcYgfvLk4THBqLdQQpzT637EF6P/view?usp=drivesdk
-💼 *3. TOROLÀLANA TÂCHE:* https://drive.google.com/file/d/17L0dbEYMf4LNKopjdGqKjVcVAe8EG1wb/view?usp=drivesdk`;
+💼 *3. TOROLÀLANA TÂCHE:* https://drive.google.com/file/d/17L0dbEYMf4LNKopjdGqKjVcVAe8EG1wb/view?usp=drivesdk
+
+✨ Araho tsara ireo torolàlana rehetra ao amin’ireo lien ireo.`;
 
                 await sock.sendMessage(update.id, { text: welcomeMsg });
             }
         }
     });
 
-    // --- 2. MODERATION ANTI-LINK ---
+    // --- 2. MODERATION ANTI-LINK MAHERY VAIKA ---
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe || !msg.key.remoteJid.endsWith('@g.us')) return;
@@ -59,32 +61,38 @@ async function startBot() {
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.groupInviteMessage?.caption || "").toLowerCase();
         const groupId = msg.key.remoteJid;
         
-        // Fantarina ny mpandefa (Sender)
+        // Hamantarana ny mpandefa
         const sender = msg.key.participant || msg.key.remoteJid;
-        const senderNumber = sender.split('@')[0];
+        const senderNumber = sender.replace(/[^0-9]/g, ''); // Mitazona isa fotsiny
 
-        // Jereo raha misy rohy
+        // Detection ny Rohy (Link)
         const hasLink = /(https?:\/\/[^\s]+|www\.[^\s]+)/g.test(text);
-        
-        // Ireo rohy mahazo alalana (Nexus sy Drive)
         const isAllowed = text.includes("drive.google.com") || text.includes("milavolamada.lovable.app");
 
-        // RAHA MISY ROHY NEFA TSY AVY AMINAO SY TSY ROHY NEXUS
-        if (hasLink && !isAllowed && senderNumber !== myNumber) {
-            console.log(`Rohy voatsikaritra avy amin'i: ${senderNumber}`);
+        // RAHA MISY ROHY:
+        if (hasLink && !isAllowed) {
+            // Hamarinina raha tsy ny tompony (Ianao) no nandefa azy
+            if (senderNumber.includes(myNumber.substring(3))) {
+                console.log("=> Rohy avy amin'ny tompony: Tsy fafana.");
+                return;
+            }
+
+            console.log(`=> ROHY VOATSIKARITRA avy amin'i: ${senderNumber}`);
             
             try {
-                // Fafana aloha ilay message
+                // FAMAFAFA NY HAFATRA
                 await sock.sendMessage(groupId, { delete: msg.key });
+                console.log("=> Hafatra voafafa soa aman-tsara.");
 
-                // Esosina ilay olona
+                // FANALANA NY OLONA
                 await sock.groupParticipantsUpdate(groupId, [sender], "remove");
+                console.log("=> Olona nesorina tao amin'ny group.");
                 
-                // Hafatra fampitandremana (Optionnel)
-                await sock.sendMessage(groupId, { text: `⚠️ Nesorina i @${senderNumber} satria nandefa rohy tsy mahazo alalana.`, mentions: [sender] });
+                await sock.sendMessage(groupId, { text: `⚠️ Nesorina ny mpikambana iray satria nandefa rohy tsy mahazo alalana.` });
 
             } catch (e) {
-                console.log("Tsy afaka mamafa olona: Hamarino raha ADMIN ny BOT.");
+                console.log("=> ERROR MODERATION: Hamarino raha ADMIN ny Bot.");
+                console.log(e.message);
             }
         }
     });
@@ -95,7 +103,7 @@ async function startBot() {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
         } else if (connection === 'open') {
-            console.log('BOT NEXUS MANDREHA...');
+            console.log('✅ BOT NEXUS EFA MIASA ARY VONONA!');
         }
     });
 }
