@@ -21,7 +21,7 @@ async function startBot() {
 
     // Pairing Code logic - Nampiana elanelana (10s) mba hialana amin'ny Error 428
     if (!sock.authState.creds.registered) {
-        const phoneNumber = "261323911654"; 
+        const phoneNumber = "261382266876"; 
         console.log("Miandry 10 segondra vao mangataka kodia...");
         setTimeout(async () => {
             try {
