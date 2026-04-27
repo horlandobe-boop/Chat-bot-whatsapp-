@@ -1,14 +1,13 @@
 {
-  "name": "wa-bot-admin",
+  "name": "nexus-microtache-bot",
   "version": "1.0.0",
-  "description": "WhatsApp Bot Admin for Railway",
+  "description": "Bot WhatsApp ho an'ny NEXUS",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
-    "pino": "^8.19.0",
-    "qrcode-terminal": "^0.12.0"
+    "pino": "^8.19.0"
   }
 }
