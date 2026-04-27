@@ -19,15 +19,20 @@ async function startBot() {
         logger: pino({ level: "silent" }),
     });
 
-    // Pairing Code logic ho an'ny finday
+    // Pairing Code logic - Nampiana elanelana (10s) mba hialana amin'ny Error 428
     if (!sock.authState.creds.registered) {
         const phoneNumber = "261323911654"; 
+        console.log("Miandry 10 segondra vao mangataka kodia...");
         setTimeout(async () => {
-            let code = await sock.requestPairingCode(phoneNumber);
-            console.log("\n-----------------------------");
-            console.log("KODIA PAIRING-NAO:", code);
-            console.log("-----------------------------\n");
-        }, 3000);
+            try {
+                let code = await sock.requestPairingCode(phoneNumber);
+                console.log("\n-----------------------------");
+                console.log("KODIA PAIRING-NAO:", code);
+                console.log("-----------------------------\n");
+            } catch (err) {
+                console.log("Tsy afaka nangataka kodia amin'izao. Miandrasa 5 minitra vao mamerina (Rate Limit).");
+            }
+        }, 10000);
     }
 
     sock.ev.on('creds.update', saveCreds);
@@ -42,7 +47,7 @@ async function startBot() {
         const sender = msg.key.participant || jid;
 
         // --- VALINY MANAJA SY MIHAJA (Reply auto) ---
-        const announcement = `Manao veloma finaritra ho anao @${sender.split('@')[0]},
+        const announcement = ` Finaritra ho anao @${sender.split('@')[0]},
 
 Mankasitraka anao amin'ny fandraisana anjara ato amin'ny vondrona. Fantatray fa mety misy fahasahiranana kely mianjady aminao eo am-pampiasana ny tranonkala amin'izao fotoana izao, koa manatona anao izahay hanome fanazavana:
 
@@ -66,8 +71,12 @@ Misaotra anao amin'ny faharetana sy ny fitokisana omenao ny NEXUS MICROTACHE.`;
             
             if (linkRegex.test(text) && !text.includes('lovable.app')) {
                 
-                // 1. Fafana avy hatrany ilay hafatra
-                await sock.sendMessage(jid, { delete: msg.key });
+                // 1. Fafana avy hatrany ilay hafatra (Raha Admin ny bot)
+                try {
+                    await sock.sendMessage(jid, { delete: msg.key });
+                } catch (e) {
+                    console.log("Tsy afaka namafa hafatra: Mety tsy Admin ny bot.");
+                }
 
                 // 2. Tantanan'ny Warning
                 if (!warnCount[sender]) {
@@ -78,20 +87,27 @@ Misaotra anao amin'ny faharetana sy ny fitokisana omenao ny NEXUS MICROTACHE.`;
                     });
                 } else {
                     // Kick amin'ny fanindroany
-                    await sock.sendMessage(jid, { text: `🚫 @${sender.split('@')[0]} nampitandremana nefa mbola mamerina, voatery esorina ato amin'ny groupe.`, mentions: [sender] });
-                    await delay(1000);
-                    await sock.groupParticipantsUpdate(jid, [sender], "remove");
-                    delete warnCount[sender];
+                    try {
+                        await sock.sendMessage(jid, { text: `🚫 @${sender.split('@')[0]} nampitandremana nefa mbola mamerina, voatery esorina ato amin'ny groupe.`, mentions: [sender] });
+                        await delay(1000);
+                        await sock.groupParticipantsUpdate(jid, [sender], "remove");
+                        delete warnCount[sender];
+                    } catch (e) {
+                        console.log("Tsy afaka nandroaka olona: Mety tsy Admin ny bot.");
+                    }
                 }
             }
         }
     });
 
+    // Logic hitazomana ny fifandraisana (Reconnection)
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
+        } else if (connection === 'open') {
+            console.log('Tafiditra soa aman-tsara ny Bot!');
         }
     });
 }
