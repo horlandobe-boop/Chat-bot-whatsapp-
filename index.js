@@ -1,98 +1,88 @@
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    delay,
     DisconnectReason,
-    fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
+    makeCacheableSignalKeyStore
+} = require("@whiskeysockets/baileys");
+const pino = require("pino");
+
+// Itahirizana ny isan'ny warning isaky ny mpampiasa
+const warnCount = {};
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('session_wa');
-    const { version } = await fetchLatestBaileysVersion();
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     
     const sock = makeWASocket({
-        version,
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'silent' }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        logger: pino({ level: "silent" }),
     });
 
-    // NOMERAONAO MANOKANA (Ilay Bot)
-    const myNumber = "261382266876"; 
-
+    // Pairing Code logic ho an'ny finday
     if (!sock.authState.creds.registered) {
+        const phoneNumber = "261323911654"; 
         setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(myNumber);
-                console.log(`\n=> PAIRING CODE: ${code}\n`);
-            } catch (err) {
-                console.error("Error request pairing code");
-            }
-        }, 10000);
+            let code = await sock.requestPairingCode(phoneNumber);
+            console.log("\n-----------------------------");
+            console.log("KODIA PAIRING-NAO:", code);
+            console.log("-----------------------------\n");
+        }, 3000);
     }
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- 1. BIENVENUE & NEXUS INFO ---
-    sock.ev.on('group-participants.update', async (update) => {
-        if (update.action === 'add') {
-            for (let num of update.participants) {
-                const welcomeMsg = `Salama 👋 Tongasoa!
-                
-📢 *FILAZANA OFISIALY – NEXUS*
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0];
+        if (!msg.message || msg.key.fromMe) return;
 
-📥 *1. LIEN APPLICATION:* https://drive.google.com/file/d/1BKlyhVPtcGbiZsTaIEIfkiJDmJPApVvX/view?usp=drivesdk
-🚀 *2. LIEN BOOST:* https://drive.google.com/file/d/1s4OFJEcYgfvLk4THBqLdQQpzT637EF6P/view?usp=drivesdk
-💼 *3. TOROLÀLANA TÂCHE:* https://drive.google.com/file/d/17L0dbEYMf4LNKopjdGqKjVcVAe8EG1wb/view?usp=drivesdk
+        const jid = msg.key.remoteJid;
+        const isGroup = jid.endsWith('@g.us');
+        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+        const sender = msg.key.participant || jid;
 
-✨ Araho tsara ireo torolàlana rehetra ao amin’ireo lien ireo.`;
+        // --- VALINY MANAJA SY MIHAJA (Reply auto) ---
+        const announcement = `Manao veloma finaritra ho anao @${sender.split('@')[0]},
 
-                await sock.sendMessage(update.id, { text: welcomeMsg });
-            }
-        }
-    });
+Mankasitraka anao amin'ny fandraisana anjara ato amin'ny vondrona. Fantatray fa mety misy fahasahiranana kely mianjady aminao eo am-pampiasana ny tranonkala amin'izao fotoana izao, koa manatona anao izahay hanome fanazavana:
 
-    // --- 2. MODERATION ANTI-LINK MAHERY VAIKA ---
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe || !msg.key.remoteJid.endsWith('@g.us')) return;
+🔹 Fivoarana eo am-panatanterahana: Eo am-panatsarana sy fampitomboana ny herin'ny rafitra (Upgrade) izahay amin'izao fotoana izao mba hanomezana tolotra haingana sy mahomby kokoa ho anao.
 
-        const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.groupInviteMessage?.caption || "").toLowerCase();
-        const groupId = msg.key.remoteJid;
-        
-        // Hamantarana ny mpandefa
-        const sender = msg.key.participant || msg.key.remoteJid;
-        const senderNumber = sender.replace(/[^0-9]/g, ''); // Mitazona isa fotsiny
+✅ Fiantohana: Manome toky anao izahay fa voatahiry an-tsakany sy an-davany ny angon-drakitrao (données) rehetra fa tsy hisy ho very.
 
-        // Detection ny Rohy (Link)
-        const hasLink = /(https?:\/\/[^\s]+|www\.[^\s]+)/g.test(text);
-        const isAllowed = text.includes("drive.google.com") || text.includes("milavolamada.lovable.app");
+📞 Fifandraisana: Raha misy fanontaniana mavesatra aminao na mila fanazavana manokana ianao, dia aza misalasala miantso ny: 0382266876
 
-        // RAHA MISY ROHY:
-        if (hasLink && !isAllowed) {
-            // Hamarinina raha tsy ny tompony (Ianao) no nandefa azy
-            if (senderNumber.includes(myNumber.substring(3))) {
-                console.log("=> Rohy avy amin'ny tompony: Tsy fafana.");
-                return;
-            }
+Misaotra anao amin'ny faharetana sy ny fitokisana omenao ny NEXUS MICROTACHE.`;
 
-            console.log(`=> ROHY VOATSIKARITRA avy amin'i: ${senderNumber}`);
+        if (isGroup) {
+            // Mamaly ny hafatra rehetra (Reply)
+            await sock.sendMessage(jid, { 
+                text: announcement, 
+                mentions: [sender] 
+            }, { quoted: msg });
+
+            // --- DETECTION NY ROHY (Anti-Link) ---
+            const linkRegex = /https?:\/\/[^\s]+/;
             
-            try {
-                // FAMAFAFA NY HAFATRA
-                await sock.sendMessage(groupId, { delete: msg.key });
-                console.log("=> Hafatra voafafa soa aman-tsara.");
-
-                // FANALANA NY OLONA
-                await sock.groupParticipantsUpdate(groupId, [sender], "remove");
-                console.log("=> Olona nesorina tao amin'ny group.");
+            if (linkRegex.test(text) && !text.includes('lovable.app')) {
                 
-                await sock.sendMessage(groupId, { text: `⚠️ Nesorina ny mpikambana iray satria nandefa rohy tsy mahazo alalana.` });
+                // 1. Fafana avy hatrany ilay hafatra
+                await sock.sendMessage(jid, { delete: msg.key });
 
-            } catch (e) {
-                console.log("=> ERROR MODERATION: Hamarino raha ADMIN ny Bot.");
-                console.log(e.message);
+                // 2. Tantanan'ny Warning
+                if (!warnCount[sender]) {
+                    warnCount[sender] = 1;
+                    await sock.sendMessage(jid, { 
+                        text: `⚠️ @${sender.split('@')[0]}, voarara ny mandefa rohy hafa ankoatra ny lovable.app ato! Fampitandremana farany io, raha mamerina ianao dia hoesorina.`,
+                        mentions: [sender]
+                    });
+                } else {
+                    // Kick amin'ny fanindroany
+                    await sock.sendMessage(jid, { text: `🚫 @${sender.split('@')[0]} nampitandremana nefa mbola mamerina, voatery esorina ato amin'ny groupe.`, mentions: [sender] });
+                    await delay(1000);
+                    await sock.groupParticipantsUpdate(jid, [sender], "remove");
+                    delete warnCount[sender];
+                }
             }
         }
     });
@@ -102,8 +92,6 @@ async function startBot() {
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
-        } else if (connection === 'open') {
-            console.log('✅ BOT NEXUS EFA MIASA ARY VONONA!');
         }
     });
 }
