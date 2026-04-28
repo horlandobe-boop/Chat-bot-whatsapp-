@@ -1,13 +1,14 @@
 {
   "name": "nexus-microtache-bot",
   "version": "1.0.0",
-  "description": "Bot WhatsApp ho an'ny NEXUS",
+  "description": "Bot WhatsApp ho an'ny NEXUS v2",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
-    "pino": "^8.19.0"
+    "pino": "^8.19.0",
+    "@hapi/boom": "^10.0.1"
   }
 }
